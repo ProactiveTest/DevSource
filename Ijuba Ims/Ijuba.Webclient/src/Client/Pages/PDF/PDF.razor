@@ -1,0 +1,150 @@
+﻿@page "/pdf"
+@attribute [MustHavePermission(FSHAction.View, FSHResource.PDF)]
+@inject IPDFClient pdfservice
+@inject IJSRuntime JSRuntime
+
+
+
+
+@if (DialogIsOpen)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    <MudAlert Severity="MudBlazor.Severity.Warning" Variant="Variant.Filled">Please wait document generating and downloading</MudAlert>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="25" Class="d-flex flex-row pt-6 pb-4" Style="height:100px;">
+                <MudIcon Icon="@Icons.Material.Filled.ViewCarousel" Color="Color.Primary" Class="mx-4"
+                Style="width:54px; height:54px;"></MudIcon>
+                <div>
+                    <MudFab Color="Color.Success" StartIcon="@Icons.Material.Filled.Receipt" Label="Print Receipt" OnClick="GetReceiptPDF" />
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="25" Class="d-flex flex-row pt-6 pb-4" Style="height:100px;">
+                <MudIcon Icon="@Icons.Material.Filled.PanoramaPhotosphereSelect" Color="Color.Secondary" Class="mx-4"
+                Style="width:54px; height:54px;"></MudIcon>
+                <div>
+                    <MudFab Color="Color.Success" StartIcon="@Icons.Material.Filled.Print" Label="Print Tax Invoice" OnClick="GetTaxInvoicePDF" />
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="25" Class="d-flex flex-row pt-6 pb-4" Style="height:100px;">
+                <MudIcon Icon="@Icons.Material.Filled.Face" Color="Color.Success" Class="mx-4"
+                Style="width:54px; height:54px;"></MudIcon>
+                <div>
+                    <MudFab Color="Color.Success" StartIcon="@Icons.Material.Filled.Inventory" Label="Print Goods Received" OnClick="GetGoodsReceivedPDF" />
+                </div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudPaper Elevation="25" Class="d-flex flex-row pt-6 pb-4" Style="height:100px;">
+                <MudIcon Icon="@Icons.Material.Filled.Groups" Color="Color.Warning" Class="mx-4"
+                Style="width:54px; height:54px;"></MudIcon>
+                <div>
+                    <MudFab Color="Color.Success" StartIcon="@Icons.Material.Filled.AttachMoney" Label="Print Till Recon" Link="/pdf/cashtillrecon" Target="_self"/>
+                </div>
+            </MudPaper>
+        </MudItem>
+
+        @if (!string.IsNullOrEmpty(pdfContent))
+        {
+            <MudItem xs="12" sm="12" md="12">
+                <center>
+                    <embed src="@pdfContent" width="1000px" height="1000px" />
+                </center>
+            </MudItem>
+           
+        }
+
+    </MudGrid>
+}
+
+
+@code {
+
+    private bool DialogIsOpen = false;
+    private string message;
+    string pdfContent;
+
+    async void GetGoodsReceivedPDF()
+    {
+
+        try
+        {
+            DialogIsOpen = true;
+            StateHasChanged();
+            var ms = new MemoryStream();
+
+            PDFDto dto = await pdfservice.GetGoodsReceivedPdfAsync();
+            ms = new  MemoryStream(dto.FileStreamResultArray);
+
+            pdfContent = "data:application/pdf;base64,";
+            pdfContent += System.Convert.ToBase64String(ms.ToArray());
+
+            //File Download
+            await   JSRuntime.SaveAs("Goods Received.pdf", ms.ToArray());
+            //Opem in new tab
+            JSRuntime.OpenNewTab("Goods Received.pdf", ms.ToArray());
+
+            DialogIsOpen = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+
+            throw ex;
+        }
+
+    }
+
+
+    public async void GetReceiptPDF()
+    {
+
+        DialogIsOpen = true;
+        StateHasChanged();
+        var ms = new MemoryStream();
+
+        PDFDto dto = await pdfservice.GetReceiptPdfAsync();
+        ms = new MemoryStream(dto.FileStreamResultArray);
+
+        pdfContent = "data:application/pdf;base64,";
+        pdfContent += System.Convert.ToBase64String(ms.ToArray());
+
+        //File Download
+        await JSRuntime.SaveAs("Receipt.pdf", ms.ToArray());
+        //Opem in new tab
+        JSRuntime.OpenNewTab("Receipt.pdf", ms.ToArray());
+
+        DialogIsOpen = false;
+        StateHasChanged();
+    }
+
+    public async void GetTaxInvoicePDF()
+    {
+
+        DialogIsOpen = true;
+        StateHasChanged();
+        var ms = new MemoryStream();
+
+        PDFDto dto = await pdfservice.GetTaxInvoicePdfAsync();
+        ms = new MemoryStream(dto.FileStreamResultArray);
+
+        pdfContent = "data:application/pdf;base64,";
+        pdfContent += System.Convert.ToBase64String(ms.ToArray());
+
+        //File Download
+        await JSRuntime.SaveAs("Tax Invoice.pdf", ms.ToArray());
+        //Opem in new tab
+        JSRuntime.OpenNewTab("Tax Invoice.pdf", ms.ToArray());
+
+        DialogIsOpen = false;
+        StateHasChanged();
+    }
+
+}

@@ -1,0 +1,1 @@
+﻿global using Ijuba.Webapi.Domain.Common.Contracts;

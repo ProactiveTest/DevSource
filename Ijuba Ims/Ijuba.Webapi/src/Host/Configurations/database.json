@@ -1,0 +1,6 @@
+{
+  "DatabaseSettings": {
+    "DBProvider": "mssql",
+    "ConnectionString": "Data Source=Beast;Initial Catalog=Ijuba;Integrated Security=True;MultipleActiveResultSets=True; TrustServerCertificate=True; Encrypt=False"
+  }
+}

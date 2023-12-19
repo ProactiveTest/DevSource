@@ -1,0 +1,17 @@
+global using Ardalis.Specification;
+global using FluentValidation;
+global using Ijuba.Webapi.Application.Common.Events;
+global using Ijuba.Webapi.Application.Common.Exceptions;
+global using Ijuba.Webapi.Application.Common.FileStorage;
+global using Ijuba.Webapi.Application.Common.Interfaces;
+global using Ijuba.Webapi.Application.Common.Models;
+global using Ijuba.Webapi.Application.Common.Persistence;
+global using Ijuba.Webapi.Application.Common.Specification;
+global using Ijuba.Webapi.Application.Common.Validation;
+global using Ijuba.Webapi.Domain.Catalog;
+global using Ijuba.Webapi.Domain.Common;
+global using Ijuba.Webapi.Domain.Common.Contracts;
+global using Ijuba.Webapi.Shared.Notifications;
+global using MediatR;
+global using Microsoft.Extensions.Localization;
+global using Microsoft.Extensions.Logging;

@@ -1,0 +1,11 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <RootNamespace>FSH.WebApi.Shared</RootNamespace>
+        <AssemblyName>FSH.WebApi.Shared</AssemblyName>
+    </PropertyGroup>
+    <ItemGroup>
+      <PackageReference Include="Blazored.SessionStorage" Version="2.4.0" />
+      <PackageReference Include="MudBlazor" Version="6.11.1" />
+    </ItemGroup>
+</Project>

@@ -1,0 +1,229 @@
+﻿@page "/Stock"
+@attribute [MustHavePermission(FSHAction.View, FSHResource.Stock)]
+@inject IStringLocalizer<Stock> L
+@inject Blazored.SessionStorage.ISessionStorageService sessionStorage
+@inject NavigationManager Navigation
+
+
+
+<FshTitle Title="@L["Stock"]" Description="@L["Manage Stock"]" />
+
+
+<EntityTable TEntity="StockDto" TId="Guid" TRequest="StockDto" Context="@Context">
+
+    <ExtraActions>
+        <MudMenuItem OnClick="(() => OpenAdjustQuantity(context))">@L["Automatic Adjustment"]</MudMenuItem>
+      
+        <MudMenuItem OnClick="(() => OpenManualAdjustment(context))">@L["Manual Adjustment"]</MudMenuItem>
+       
+    </ExtraActions>
+
+ 
+
+
+    <EditFormContent>
+  
+
+        <MudItem xs="12" md="6">
+                <MudTextField T="string" For="@(() => context.StockCode)" @bind-Value="context.StockCode" Label="@L["Stock Code"]" />
+        </MudItem>
+        <MudItem xs="12" md="6">
+                <MudTextField T="string" For="@(() => context.Description)" @bind-Value="context.Description" Label="@L["Description"]" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+                <MudTextField T="decimal" For="@(() => context.Quantity)" @bind-Value="context.Quantity" Label="@L["Quantity"]" />
+        </MudItem>
+        <MudItem xs="12" md="6">
+                <MudTextField T="decimal" For="@(() => context.CostPrice)" @bind-Value="context.CostPrice" Label="@L["Cost Price"]" />
+        </MudItem>
+        <MudItem xs="12" md="6">
+                <MudTextField T="decimal" For="@(() => context.RetailPrice)" @bind-Value="context.RetailPrice" Label="@L["Retail Price"]" />
+        </MudItem>
+
+        @if(! Context.AddEditModal.IsCreate)
+        {
+            SupplierId = context.SupplierId;
+        }
+
+         <MudItem xs="12" md="6">
+                <MudSelect T="Guid" Variant="Variant.Filled" @bind-Value="@SupplierId">
+                    <MudSelectItem Value="new Guid()">--Select Supplier--</MudSelectItem>
+                    @foreach (var supplier in lstsuppliers)
+                    {
+                        <MudSelectItem Value="@supplier.SupplierId"> @supplier.CompanyName</MudSelectItem>
+
+                    }
+            </MudSelect>
+         </MudItem>
+        <MudItem xs="12" md="6">
+            <MudSwitch @bind-Checked="context.Hold" Label="On Hold" Color="Color.Success" />
+        </MudItem>
+  
+
+    </EditFormContent>
+
+
+
+</EntityTable>
+
+
+@code {
+
+    [CascadingParameter]
+    protected Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    [Inject]
+    protected IAuthorizationService AuthService { get; set; } = default!;
+
+    [Inject]
+    protected IStockClient StockClient { get; set; } = default!;
+
+    [Inject]
+    protected ISupplierClient SupplierClient { get; set; } = default!;
+
+    protected EntityServerTableContext<StockDto, Guid, StockDto> Context { get; set; } = default!;
+
+    // private EntityTable<StockDto, Guid, StockDto> _table = default!;
+
+    private Guid LoggedInuserid { get; set; }
+
+    private string FirstName { get; set; }
+    private string LastName { get; set; }
+    public bool _isOpen;
+    StockDto newdto = new StockDto();
+    List<SupplierDto> lstsuppliers = new List<SupplierDto>();
+    Guid SupplierId = new Guid();
+
+    protected override async void OnInitialized()
+    {
+
+        var user = (await AuthState).User;
+        LoggedInuserid = new Guid(user.GetUserId());
+        FirstName = user.GetFirstName();
+        LastName = user.GetSurname();
+
+        Context = new(
+            entityName: L["Stock"],
+            entityNamePlural: L["Stock"],
+            entityResource: FSHResource.Supplier,
+            fields: new()
+                    {
+                        // new(stock => stock.Id, L["Id"], "Id"),
+                        new(stock => stock.StockCode, L["Stock Code"], "Stock Code"),
+                        new(stock => stock.Quantity, L["Quantity"], "Quantity"),
+                        new(stock => stock.Description, L["Description"], "Description"),
+                        new(stock => stock.CostPrice, L["Cost Price"], "Cost Price"),
+                        new(stock => stock.RetailPrice, L["Retail Price"], "Retail Price"),
+                        new(stock => stock.Hold, L["On Hold"], "On Hold"),
+                    },
+            idFunc: stock => stock.Id,
+
+            searchFunc: async filter =>
+            {
+                return await CustomSearch(filter);
+            },
+
+            createFunc: async stock =>
+            {
+                Context.AddEditModal.Validate(stock);
+                await CreateStock(stock);
+            },
+            hasExtraActionsFunc: () => true,
+            updateFunc: async (id, stock) =>
+            {
+                await UpdateStock(stock);
+            },
+            deleteFunc: async id => await StockClient.DeleteAsync(id),
+            exportAction: string.Empty
+            );
+
+
+        var suppagresponse = await SupplierClient.SearchSupplierAsync();
+        lstsuppliers = suppagresponse.Data.ToList();
+
+
+
+    }
+
+    private async void OpenAdjustQuantity(StockDto item)
+    {
+        await sessionStorage.SetItemAsync("AdjustmentStock", item);
+        await sessionStorage.SetItemAsync("AdjustmentType", "Auto");
+        Navigation.NavigateTo("/StockAdjustment");
+    }
+
+    private async void OpenManualAdjustment(StockDto item)
+    {
+        await sessionStorage.SetItemAsync("AdjustmentStock", item);
+        await sessionStorage.SetItemAsync("AdjustmentType", "Manual");
+        Navigation.NavigateTo("/StockAdjustment");
+    }
+
+
+    private async Task UpdateStock(StockDto dto)
+    {
+        dto.SupplierId = SupplierId;
+        dto.UserID = LoggedInuserid;
+        await StockClient.UpdateAsync(dto.Id, dto);
+    }
+
+    private async Task CreateStock(StockDto dto)
+    {
+        dto.SupplierId = SupplierId;
+        dto.UserID = LoggedInuserid;
+        await StockClient.CreateAsync(dto);
+    }
+
+    public void ToggleOpen()
+    {
+        if (_isOpen)
+        {
+            _isOpen = false;
+        }
+        else
+        {
+            _isOpen = true;
+        }
+        
+
+    }
+
+    // searchFunc: async filter => (await BrandsClient
+    //          .SearchAsync(filter.Adapt<SearchBrandsRequest>()))
+    //          .Adapt<PaginationResponse<BrandDto>>(),
+
+    private async Task<PaginationResponse<StockDto>> CustomSearch(PaginationFilter filter)
+    {
+        PaginationResponse<StockDto> paginationresponse = new PaginationResponse<StockDto>();
+        PaginationResponseOfStockDto paginationResponseOfStockDto = new PaginationResponseOfStockDto();
+
+        try
+        {
+
+            var listims = await StockClient.SearchAsync(filter.Adapt<SearchStockRequest>());
+
+            paginationResponseOfStockDto.Data = listims.Data.ToList();
+            paginationResponseOfStockDto.CurrentPage = listims.CurrentPage;
+            paginationResponseOfStockDto.HasPreviousPage = listims.HasPreviousPage;
+            paginationResponseOfStockDto.HasNextPage = listims.HasNextPage;
+            paginationResponseOfStockDto.PageSize = listims.PageSize;
+            paginationResponseOfStockDto.TotalCount = listims.TotalCount;
+            paginationResponseOfStockDto.TotalPages = listims.TotalPages;
+        }
+        catch (Exception ex)
+        {
+            throw ex;
+        }
+
+
+        // }
+
+
+        paginationresponse = paginationResponseOfStockDto.Adapt<PaginationResponse<StockDto>>();
+
+        return paginationresponse;
+    }
+
+}
+

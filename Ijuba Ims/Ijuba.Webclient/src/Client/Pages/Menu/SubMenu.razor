@@ -1,0 +1,159 @@
+﻿@page "/SubMenu"
+@attribute [MustHavePermission(FSHAction.View, FSHResource.Supplier)]
+@inject IStringLocalizer<SubMenu> L
+@inject Blazored.SessionStorage.ISessionStorageService sessionStorage
+
+<MudPopover Open="@_isOpen" Fixed="true" Class="px-4 pt-4">
+    <div class="d-flex flex-column">
+        <MudText>The Order No Has already been used!. Please check the table below and add accordingly</MudText>
+        <MudButton OnClick="@ToggleOpen" Class="ml-auto mr-n3 mb-1" Color="Color.Error">Close</MudButton>
+    </div>
+</MudPopover>
+
+<MudCard Elevation="25">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText>@menuHeading.Name</MudText>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+      <MudGrid>
+                <MudItem xs="12" md="6">
+                 <MudTextField T="string" @bind-Value="submenu.Name" Label="@L["Sub Menu Name"]" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField T="int" @bind-Value="submenu.Order" Label="@L["Order"]" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField T="string" @bind-Value="submenu.Href" Label="@L["Href Page"]" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField T="string" @bind-Value="submenu.Icon" Label="@L["Icon"]" />
+            </MudItem>
+            
+            </MudGrid>
+      
+    </MudCardContent>
+    <MudCardActions Class="pb-4 pl-4">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto" StartIcon="@Icons.Filled.Save"
+                    ButtonType="ButtonType.Submit" OnClick="AddSubMenu">@L["Add"]</MudButton>
+    </MudCardActions>
+
+     <MudDataGrid Items="@lstsubmenu" Filterable="false" Groupable="false">
+         <Columns>
+             <PropertyColumn Property="x => x.Name" Title="Submenu Name" />
+             <PropertyColumn Property="x => x.Order" Title="Order" />
+             <PropertyColumn Property="x => x.Href" Title="Href" />
+             <PropertyColumn Property="x => x.Icon" Title="Icon" />
+             <TemplateColumn CellClass="d-flex justify-end">
+                 <CellTemplate>
+                     <MudStack Row>
+                        <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary" @onclick="() => DeleteFromList(context.Item)">Delete Item</MudButton>
+                    </MudStack>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+    </MudDataGrid>
+</MudCard>
+
+
+ @code{
+
+    [CascadingParameter]
+    protected Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    [Inject]
+    protected IAuthorizationService AuthService { get; set; } = default!;
+
+    [Inject]
+    protected IMenuClient IMSClient { get; set; } = default!;
+
+    MenuHeadingDto menuHeading = new MenuHeadingDto();
+    SubMenuDto submenu = new SubMenuDto();
+    List<SubMenuDto> lstsubmenu = new List<SubMenuDto>();
+
+    private Guid LoggedInuserid { get; set; }
+    private string FirstName { get; set; }
+    private string LastName { get; set; }
+    public bool _isOpen;
+
+    protected override async void OnInitialized()
+    {
+        //await _localStorage.RemoveItemAsync(StorageConstants.Local.Deliveries, cancellationToken);
+        var user = (await AuthState).User;
+        LoggedInuserid = new Guid(user.GetUserId());
+        FirstName = user.GetFirstName();
+        LastName = user.GetSurname();
+
+    }
+
+    public void ToggleOpen()
+    {
+        if (_isOpen)
+        {
+            _isOpen = false;
+        }
+        else
+        {
+            _isOpen = true;
+        }
+        //StateHasChanged();
+
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        menuHeading = await sessionStorage.GetItemAsync<MenuHeadingDto>("MenuHeading");
+        var menulist = await IMSClient.GetAllMenusandSubMenusAsync();
+        lstsubmenu = menulist.Where(x => x.MenuHeadingId == menuHeading.Id).ToList();
+    }
+
+
+    public async void DeleteFromList(SubMenuDto item)
+    {
+        await IMSClient.DeleteSubMenuAsync(item.Id);
+
+        lstsubmenu.Remove(item);
+        StateHasChanged();
+    }
+
+    public async void AddSubMenu()
+    {
+        bool exists = false;
+
+        exists = lstsubmenu.Exists(x => x.Order == submenu.Order);
+
+        if (exists == false)
+        {
+
+            SubMenuDto newsubmenu = new SubMenuDto();
+            newsubmenu.Name = submenu.Name;
+            newsubmenu.Order = submenu.Order;
+            newsubmenu.Icon = submenu.Icon;
+            newsubmenu.Href = submenu.Href;
+            newsubmenu.CreatedBy = LoggedInuserid;
+            newsubmenu.MenuHeadingId = menuHeading.Id;
+            newsubmenu.LastModifiedBy = LoggedInuserid;
+            newsubmenu.MenuHeadingName = menuHeading.Name;
+            //remove after testing
+            newsubmenu.Icon = "";
+
+            var createdmenu = await IMSClient.CreateSubMenuHeadingAsync(newsubmenu);
+            newsubmenu.Id = createdmenu.Id;
+
+            lstsubmenu.Add(newsubmenu);
+
+
+            submenu.Name = "";
+            submenu.Order = 0;
+            submenu.Href = "";
+            submenu.Icon = "";
+
+            StateHasChanged();
+        }
+        else
+        {
+            _isOpen = true;
+        }
+    }
+}

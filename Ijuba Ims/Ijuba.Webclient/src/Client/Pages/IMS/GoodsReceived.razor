@@ -1,0 +1,230 @@
+﻿@page "/goods"
+@inject IStringLocalizer<Invoice> L
+@inject Blazored.SessionStorage.ISessionStorageService sessionStorage
+@inject NavigationManager Navigation
+
+<FshTitle Title="@L["Goods Received"]" Description="@L["Print Goods Received"]" />
+
+
+<EntityTable TEntity="SupplierDto" TId="Guid" TRequest="SupplierDto" Context="@Context">
+
+    <ExtraActions>
+        <MudMenuItem OnClick="(() => OpenInvoicePage(context))"> @L["Print Goods Received"]</MudMenuItem>
+        </ExtraActions>
+
+        <EditFormContent>
+
+            <MudPopover Open="@_isOpen" Fixed="true" Class="px-4 pt-4">
+                <div class="d-flex flex-column">
+                    <MudText>The Account Number has Already Been Used!.</MudText>
+                    <MudButton OnClick="@ToggleOpen" Class="ml-auto mr-n3 mb-1" Color="Color.Error">Close</MudButton>
+                </div>
+            </MudPopover>
+
+            <MudItem xs="12" md="6">
+                <MudTextField T="string" For="@(() => context.CompanyName)" @bind-Value="@context.CompanyName" Label="@L["Company Name"]" />
+            </MudItem>
+
+
+            <MudItem xs="12" md="6">
+                <MudTextField T="string" For="@(() => context.AccountNo)" @bind-Value="@context.AccountNo" Label="@L["Account No"]" OnBlur="@HandleAccountAsync" />
+            </MudItem>
+
+        </EditFormContent>
+
+    </EntityTable>
+
+
+
+
+
+    @code {
+
+    [CascadingParameter]
+    protected Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    [Inject]
+    protected IAuthorizationService AuthService { get; set; } = default!;
+
+    [Inject]
+    protected ICustomerClient IMSClient { get; set; } = default!;
+
+    protected EntityServerTableContext<SupplierDto, Guid, SupplierDto> Context { get; set; } = default!;
+
+    CancellationToken? cancellationToken = null;
+
+    private Guid LoggedInuserid { get; set; }
+    private string FirstName { get; set; }
+    private string LastName { get; set; }
+    public bool _isOpen;
+    PaginationResponse<SupplierDto> paginationresponse = new PaginationResponse<SupplierDto>();
+    PaginationResponseOfSupplierDto paginationresponseofSupplierDto = new PaginationResponseOfSupplierDto();
+
+    protected override async void OnInitialized()
+    {
+        //await _localStorage.RemoveItemAsync(StorageConstants.Local.Deliveries, cancellationToken);
+
+
+        var user = (await AuthState).User;
+        LoggedInuserid = new Guid(user.GetUserId());
+        FirstName = user.GetFirstName();
+        LastName = user.GetSurname();
+
+        Context = new(
+            entityName: L["Supplier"],
+            entityNamePlural: L["Supplier"],
+            entityResource: FSHResource.Supplier,
+            updateAction: string.Empty,
+            deleteAction: string.Empty,
+            createAction: string.Empty,
+            fields: new()
+                                    {
+                new(customer => customer.CustomerID, L["Id"], "Id"),
+                new(customer => customer.CompanyName, L["Company Name"], "Company Name"),
+                new(customer => customer.ContactNo, L["Contact Details"], "Contact No"),
+                new(customer => customer.CustomerNo, L["Vendor No"], "Customer No"),
+                new(customer => customer.AccountNo, L["AccountNo"], "Account No"),
+                                    },
+            idFunc: customer => customer.CustomerID,
+
+
+            searchFunc: async filter =>
+            {
+                return await CustomSearch(filter);
+            },
+            hasExtraActionsFunc: () => true,
+            exportAction: string.Empty
+            );
+
+        //newdto =  await _localStorage.GetItemAsync<DeliveryDto>(StorageConstants.Local.Deliveries);
+    }
+
+
+
+    public void ToggleOpen()
+    {
+        if (_isOpen)
+        {
+            _isOpen = false;
+        }
+        else
+        {
+            _isOpen = true;
+        }
+        //StateHasChanged();
+        Context.AddEditModal.ForceRender();
+    }
+
+    public async Task HandleAccountAsync()
+    {
+        // await Task.Delay(100);
+        // throw new Exception("Something went wrong...");
+
+        foreach (var sup in paginationresponseofSupplierDto.Data)
+        {
+            if (Context.AddEditModal.RequestModel.AccountNo == sup.AccountNo)
+            {
+                _isOpen = true;
+                //StateHasChanged();
+                Context.AddEditModal.ForceRender();
+            }
+        }
+
+
+    }
+
+    private async Task<PaginationResponse<CustomerDto>> CustomSearch(PaginationFilter filter)
+    {
+
+        try
+        {
+
+
+            var listims = await IMSClient.SearchCustomerAsync();
+
+            paginationresponseofSupplierDto.Data = listims.Data.ToList();
+            paginationresponseofSupplierDto.CurrentPage = listims.CurrentPage;
+            paginationresponseofSupplierDto.HasPreviousPage = listims.HasPreviousPage;
+            paginationresponseofSupplierDto.HasNextPage = listims.HasNextPage;
+            paginationresponseofSupplierDto.PageSize = listims.PageSize;
+            paginationresponseofSupplierDto.TotalCount = listims.TotalCount;
+            paginationresponseofSupplierDto.TotalPages = listims.TotalPages;
+        }
+        catch (Exception ex)
+        {
+            throw ex;
+        }
+
+
+        // }
+
+
+        paginationresponse = PaginationResponseOfcustomerDto.Adapt<PaginationResponse<CustomerDto>>();
+
+        return paginationresponse;
+    }
+
+
+    private async Task CreateCustomer(CustomerDto dto)
+    {
+        try
+        {
+            //dto.BankingDetails = bankingdto;
+            //dto.ContactDetails = contactdto;
+            dto.CreatedBy = LoggedInuserid;
+
+            await IMSClient.CreateCustomerAsync(dto);
+
+        }
+        catch (Exception ex)
+        {
+
+            throw ex;
+        }
+    }
+
+
+    private async Task UpdateCustomer(CustomerDto dto)
+    {
+        try
+        {
+
+            dto.LastModifiedBy = LoggedInuserid;
+            await IMSClient.UpdateCustomerAsync(dto);
+
+        }
+        catch (Exception ex)
+        {
+
+            throw ex;
+        }
+    }
+
+    private async Task DeleteCreditor(CustomerDto dto)
+    {
+        try
+        {
+
+
+            await IMSClient.DeleteCustomerAsync(dto.CustomerID);
+
+        }
+        catch (Exception ex)
+        {
+
+            throw ex;
+        }
+    }
+
+    public async void OpenInvoicePage(CustomerDto customer)
+    {
+
+
+        await sessionStorage.SetItemAsync("InvoiceCustomer", customer);
+
+        Navigation.NavigateTo("/InvoiceDetails");
+
+    }
+
+
+}

@@ -1,0 +1,355 @@
+﻿@page "/CashTransActionold"
+@attribute [MustHavePermission(FSHAction.View, FSHResource.Customer)]
+@inject IStringLocalizer<CashTransaction> L
+
+
+<FshTitle Title="@L["Cash Transaction"]" Description="@L["Manage Cash Transactions"]" />
+
+
+
+<EntityTable @ref="_table"  TEntity="CashTransactionDto" TId="Guid" TRequest="CashTransactionDto" Context="@Context">
+
+    <AdvancedSearchContent>
+        <MudGrid>
+            <MudItem xs="12" md="3">
+                <MudText> StartDate </MudText>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudDatePicker Label="Start Date" @bind-Date="startdate" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudText> EndDate </MudText>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudDatePicker Label="End Date" @bind-Date="enddate" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary" OnClick="FilterResults">Filter</MudButton>
+            </MudItem>
+        </MudGrid>
+    </AdvancedSearchContent>
+
+
+    <EditFormContent>
+
+        <MudPopover Open="@_isOpen" Fixed="true" Class="px-4 pt-4" AnchorOrigin="Origin.CenterCenter" TransformOrigin="Origin.CenterCenter">
+            <div class="d-flex flex-column">
+                <MudDataGrid Items="@lstCashTranTypes" Filterable="false" Groupable="false">
+                    <Columns>
+                        <PropertyColumn Property="x => x.Name" Title="Name" />
+                        <PropertyColumn Property="x => x.Description" Title="Desciption" />
+                        <TemplateColumn CellClass="d-flex justify-end">
+                            <CellTemplate Context="Item">
+                                <MudStack Row>
+                                    <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary" @onclick="() => SelectTransType(Item.Item)">Select</MudButton>
+                                </MudStack>
+                            </CellTemplate>
+                        </TemplateColumn>
+                    </Columns>
+                </MudDataGrid>
+                <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary" @onclick="ToggleOpen">Close</MudButton>
+            </div>
+        </MudPopover>
+
+
+
+
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.CashTransactionName)" @bind-Value="@context.CashTransactionName" Label="@L["Cash Transaction Type"]" OnBlur="OpenCashTranPop" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="decimal" For="@(() => context.Amount)" @bind-Value="@context.Amount" Label="@L["Amount"]" />
+        </MudItem>
+
+        @*  <MudItem xs="12" md="6">
+        <MudTextField T="string" For="@(() => context.Ref_Id.ToString())" @bind-Value="@context.Ref_Id.ToString()" Label="@L["Ref ID"]" />
+        </MudItem> *@
+
+
+
+        @*  <MudDataGrid Items="@lstCashTranTypes" Filterable="false" Groupable="false">
+        <Columns>
+        <PropertyColumn Property="x => x.Name" Title="Name" />
+        <PropertyColumn Property="x => x.Description" Title="Desciption" />
+        <TemplateColumn CellClass="d-flex justify-end">
+        <CellTemplate>
+        <MudStack Row>
+        <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary" @onclick="() => DeleteFromList(context.Item)">Delete Item</MudButton>
+
+
+        <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary" @onclick="() => EditListItem(context.Item)">Edit Item</MudButton>
+        </MudStack>
+        </CellTemplate>
+        </TemplateColumn>
+        </Columns>
+        </MudDataGrid> *@
+
+
+
+    </EditFormContent>
+
+
+
+
+</EntityTable>
+
+@code {
+
+    [CascadingParameter]
+    protected Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    [Inject]
+    protected IAuthorizationService AuthService { get; set; } = default!;
+
+    [Inject]
+    protected ICashTransactionClient IMSClient { get; set; } = default!;
+
+    protected EntityServerTableContext<CashTransactionDto, Guid, CashTransactionDto> Context { get; set; } = default!;
+
+    private EntityTable<CashTransactionDto, Guid, CashTransactionDto> _table = default!;
+
+    //protected EntityServerTableContext<CashTransactionDto, Guid, CashTransactionDto> Context { get; set; } = default!;
+
+    //protected EntityClientTableContext<RelatedAuditTrail, Guid, CashTransactionDto> Context { get; set; } = default!;
+
+    CancellationToken? cancellationToken = null;
+
+    private Guid LoggedInuserid { get; set; }
+    private string FirstName { get; set; }
+    private string LastName { get; set; }
+    public bool _isOpen;
+    public bool _isOpenDelete;
+    DateTime? startdate = DateTime.Today;
+    DateTime? enddate = DateTime.Today;
+
+    CashTransactionTypeDto selectedtrantype = new CashTransactionTypeDto();
+
+    List<CashTransactionTypeDto> lstCashTranTypes = new List<CashTransactionTypeDto>();
+
+    PaginationResponse<CashTransactionDto> paginationresponse = new PaginationResponse<CashTransactionDto>();
+    PaginationResponseOfCashTransactionDto paginationresponseOfCashTransactionDto = new PaginationResponseOfCashTransactionDto();
+
+    private MudDateRangePicker _dateRangePicker = default!;
+    private DateRange? _dateRange;
+    private bool _searchInOldValues;
+    private bool _searchInNewValues;
+    private List<RelatedAuditTrail> _trails = new();
+
+    List<CashTransactionDto> lstCashTans = new List<CashTransactionDto>();
+
+
+    protected override async void OnInitialized()
+    {
+
+        var user = (await AuthState).User;
+        LoggedInuserid = new Guid(user.GetUserId());
+        FirstName = user.GetFirstName();
+        LastName = user.GetSurname();
+
+        Guid SelectedTranID;
+        string SelectedTranName;
+        string SelectedTranDescrition;
+
+
+        Context = new(
+            entityName: L["CashTransaction"],
+            entityNamePlural: L["CashTransactions"],
+           entityResource: FSHResource.Products,
+           fields: new()
+               {
+                new(tran => tran.Id, L["Id"], "Id"),
+                new(tran => tran.CashTransactionName, L["Transaction Type"], "Transaction Type"),
+                new(tran => tran.TransactionDate, L["TransactionDate"], "TransactionDate"),
+                new(tran => tran.Amount, L["Amount"], "Amount"),
+                new(tran => tran.Ref_Id, L["Ref_Id"], "Ref_Id"),
+               },
+           enableAdvancedSearch: true,
+           idFunc: tran => tran.Id,
+           searchFunc: async filter =>
+           {
+               var cashtranfilter = filter.Adapt<SearchCashTransactionRequest>();
+               cashtranfilter._endDate = enddate;
+               cashtranfilter._startDate = startdate;
+
+               // productFilter.BrandId = SearchBrandId == default ? null : SearchBrandId;
+               // productFilter.MinimumRate = SearchMinimumRate;
+               // productFilter.MaximumRate = SearchMaximumRate;
+
+               var result = await IMSClient.SearchCashTransAsync(cashtranfilter);
+               return result.Adapt<PaginationResponse<CashTransactionDto>>();
+           },
+           createFunc: async tran =>
+            {
+
+                await CreateTransaction(tran);
+            },
+           updateFunc: async (id, tran) =>
+            {
+                await UpdateTransaction(tran);
+            },
+            deleteFunc: async (id) =>
+            {
+                await DeleteTransaction(id);
+            },
+             exportAction: string.Empty
+
+           );
+
+        //lstCashTranTypes = IMSClient.get();
+
+        var listims = await IMSClient.SearchCashTransactionTypesAsync();
+
+        lstCashTranTypes = listims.Data.ToList();
+
+
+    }
+
+    void SelectTransType(CashTransactionTypeDto trantype)
+    {
+        selectedtrantype = trantype;
+        Context.AddEditModal.RequestModel.CashTransactionName = selectedtrantype.Name;
+        Context.AddEditModal.RequestModel.CashTransactionTypeId = selectedtrantype.Id;
+        ToggleOpen();
+    }
+
+    void OpenCashTranPop()
+    {
+        _isOpen = true;
+        StateHasChanged();
+        Context.AddEditModal.ForceRender();
+    }
+
+    public void ToggleOpen()
+    {
+        if (_isOpen)
+        {
+            _isOpen = false;
+        }
+        else
+        {
+            _isOpen = true;
+        }
+        //StateHasChanged();
+        Context.AddEditModal.ForceRender();
+    }
+
+    public void ToggleOpenDelete()
+    {
+        if (_isOpenDelete)
+        {
+            _isOpenDelete = false;
+        }
+        else
+        {
+            _isOpenDelete = true;
+        }
+        //StateHasChanged();
+        Context.AddEditModal.ForceRender();
+    }
+
+
+    void FilterResults()
+    {
+        //Context.ClientContext.LoadDataFunc: async () => (await UsersClient.GetListAsync()).ToList();
+
+        lstCashTans = lstCashTans.Take(1).ToList();
+        paginationresponseOfCashTransactionDto.Data = lstCashTans;
+        StateHasChanged();
+    }
+
+
+    private async Task<PaginationResponse<CashTransactionDto>> CustomSearch(PaginationFilter filter)
+    {
+        try
+        {
+            var listims = await IMSClient.SearchCashTransactionsAsync();
+            lstCashTans = listims.Data.ToList();
+
+            paginationresponseOfCashTransactionDto.Data = listims.Data.ToList();
+            paginationresponseOfCashTransactionDto.CurrentPage = listims.CurrentPage;
+            paginationresponseOfCashTransactionDto.HasPreviousPage = listims.HasPreviousPage;
+            paginationresponseOfCashTransactionDto.HasNextPage = listims.HasNextPage;
+            paginationresponseOfCashTransactionDto.PageSize = listims.PageSize;
+            paginationresponseOfCashTransactionDto.TotalCount = listims.TotalCount;
+            paginationresponseOfCashTransactionDto.TotalPages = listims.TotalPages;
+        }
+        catch (Exception ex)
+        {
+            throw ex;
+        }
+
+        paginationresponse = paginationresponseOfCashTransactionDto.Adapt<PaginationResponse<CashTransactionDto>>();
+
+        return paginationresponse;
+    }
+
+
+    private async Task CreateTransaction(CashTransactionDto dto)
+    {
+        try
+        {
+
+            dto.UserId = LoggedInuserid;
+            dto.TransactionDate = DateTime.Now;
+            dto.Ref_Id = new Guid();
+
+            await IMSClient.CreateCashTransActionAsync(dto);
+
+        }
+        catch (Exception ex)
+        {
+
+            throw ex;
+        }
+    }
+
+
+    private async Task UpdateTransaction(CashTransactionDto dto)
+    {
+        try
+        {
+
+            dto.UserId = LoggedInuserid;
+            await IMSClient.UpdateCashTransActionAsync(dto);
+
+        }
+        catch (Exception ex)
+        {
+
+            throw ex;
+        }
+    }
+
+    private async Task DeleteTransaction(Guid Id)
+    {
+        try
+        {
+
+
+            await IMSClient.DeleteCashTransactionAsync(Id);
+
+
+
+
+        }
+        catch (Exception ex)
+        {
+
+            throw ex;
+        }
+    }
+
+    public class RelatedAuditTrail : AuditDto
+    {
+        public bool ShowDetails { get; set; }
+        public DateTime LocalTime { get; set; }
+    }
+
+}
+
+
+
+
+

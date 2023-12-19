@@ -1,0 +1,556 @@
+﻿@page "/InvoiceDetails"
+@attribute [MustHavePermission(FSHAction.View, FSHResource.Supplier)]
+@inject IStringLocalizer<InvoiceDetails> L
+@inject Blazored.SessionStorage.ISessionStorageService sessionStorage
+@inject IPDFClient pdfservice
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
+
+
+
+<MudPopover Open="@_isOpen" Fixed="true" Class="px-4 pt-4" AnchorOrigin="Origin.CenterCenter" TransformOrigin="Origin.CenterCenter">
+    <div class="d-flex flex-column">
+        <MudTextField T="string" @bind-Value="lineitem.StockCode" Label="@L["Stock Code"]" ReadOnly />
+         <MudTextField T="string" @bind-Value="lineitem.Description" Label="@L["Description"]" ReadOnly />
+         <MudTextField T="decimal" @bind-Value="CurrentStockQuantity" Label="@L["Current Quantity"]" ReadOnly />
+         <MudTextField T="decimal" @bind-Value="lineitem.Quanity" Label="@L["Quantity Dispensed"]" OnBlur="Calculate" />
+         <MudTextField T="decimal" @bind-Value="lineitem.Discount" Label="@L["Discount"]" OnBlur="Calculate" />
+         <MudTextField T="decimal" @bind-Value="lineitem.VatTotal" Label="@L["Vat Total"]" ReadOnly />
+         <MudTextField T="decimal" @bind-Value="lineitem.Total" Label="@L["Total"]" ReadOnly />
+        @if (!is_QuantityError)
+        {
+         <MudButton OnClick="@Save" Class="ml-auto mr-n3 mb-1" Color="Color.Error">Done</MudButton>
+        }
+         <MudButton OnClick="@ToggleOpen" Class="ml-auto mr-n3 mb-1" Color="Color.Error">Close</MudButton>
+     </div>
+ </MudPopover>
+
+ <MudPopover Open="@_isOpenSave" Fixed="true" Class="px-4 pt-4" AnchorOrigin="Origin.CenterCenter" TransformOrigin="Origin.CenterCenter">
+     <div class="d-flex flex-column">
+
+         <MudText>Invoice Saved</MudText>
+         <MudButton OnClick="@ToggleOpenSave" Class="ml-auto mr-n3 mb-1" Color="Color.Error">Close</MudButton>
+     </div>
+ </MudPopover>
+
+
+ @if (context != null)
+{
+
+    <MudCard Elevation="25">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText>@L["Invoice Details"]</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudGrid>
+                    <MudItem xs="12" md="12">
+                        <MudTextField T="string" @bind-Value="context.CompanyName" Label="@L["Company Name"]" />
+                    </MudItem>
+                    <MudItem xs="12" md="12">
+
+                    </MudItem>
+
+                </MudGrid>
+            </MudCardContent>
+        </MudCard>
+}
+
+
+
+@if (is_QuantityError)
+{
+    <MudAlert Severity="MudBlazor.Severity.Warning" Variant="Variant.Filled">The quantity entered is greater than the current quantity available.</MudAlert>
+}
+
+<EntityTable @ref="_table" TEntity="StockDto" TId="Guid" TRequest="StockDto" Context="@Context">
+
+    <ExtraActions>
+        <MudMenuItem OnClick="(() => AddStockCode(context))">@L["Add Item"]</MudMenuItem>
+
+        </ExtraActions>
+
+    </EntityTable>
+
+
+
+
+    <MudDataGrid Items="@lstlineItemsDtos" Filterable="false" Groupable="false">
+        <Columns>
+            <PropertyColumn Property="x => x.StockCode" Title="Stock Code" />
+            <PropertyColumn Property="x => x.Price" Title="Price" />
+            <PropertyColumn Property="x => x.Quanity" Title="Quanity" />
+            <PropertyColumn Property="x => x.Discount" Title="Discount" />
+            <PropertyColumn Property="x => x.VatTotal" Title="VatTotal" />
+            <PropertyColumn Property="x => x.Total" Title="Total" />
+            <TemplateColumn CellClass="d-flex justify-end">
+                <CellTemplate>
+                    <MudStack Row>
+                    <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary" @onclick="() => DeleteFromList(context.Item)">Delete Item</MudButton>
+
+
+                    <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary" @onclick="() => EditListItem(context.Item)">Edit Item</MudButton>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+</MudDataGrid>
+
+@if (DialogIsOpen)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    <MudAlert Severity="MudBlazor.Severity.Warning" Variant="Variant.Filled">Please wait document generating and downloading</MudAlert>
+}
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudTextField T="decimal" @bind-Value="invoice.TotalsAmount" Label="@L["Total Amount"]" ReadOnly />
+     </MudItem>
+     <MudItem xs="12" md="6">
+         <MudTextField T="decimal" @bind-Value="invoice.TotalsDiscount" Label="@L["Total Discount"]" ReadOnly />
+     </MudItem>
+     <MudItem xs="12" md="6">
+         <MudTextField T="decimal" @bind-Value="invoice.TotalsVat" Label="@L["Total Vat"]" ReadOnly />
+     </MudItem>
+     <MudItem xs="12" md="6">
+         <MudTextField T="decimal" @bind-Value="invoice.TotalDue" Label="@L["Total Due"]" ReadOnly />
+     </MudItem>
+    @if (_isInvoiceEdit)
+    {
+        <MudItem xs="12" md="4">
+            <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary" OnClick="SaveInvoice">Save Invoice</MudButton>
+        </MudItem>
+    }
+    else
+    {
+        <MudItem xs="12" md="4">
+            <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Info" OnClick="SaveInvoice">Create Invoice</MudButton>
+        </MudItem>
+    }
+    @if (_isInvoiceEdit)
+    {
+        <MudItem xs="12" md="4">
+            <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary" OnClick="PrintReceipt">Print Invoice</MudButton>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary" OnClick="PrintDeliveryNote">Print Delivery Note</MudButton>
+        </MudItem>
+    }
+
+
+</MudGrid>
+
+
+
+
+@code {
+
+    CustomerDto context;
+    private bool DialogIsOpen = false;
+
+    InvoiceLineItemsDto lineitem = new InvoiceLineItemsDto();
+    List<InvoiceLineItemsDto> lstlineItemsDtos = new List<InvoiceLineItemsDto>();
+    InvoiceDto invoice = new InvoiceDto();
+
+    decimal CurrentStockQuantity;
+
+    [Inject]
+    protected IStockClient StockClient { get; set; } = default!;
+    //protected EntityServerTableContext<StockDto, Guid, StockDto> Context { get; set; } = default!;
+    protected EntityServerTableContext<StockDto, Guid, StockDto> Context { get; set; } = default!;
+    private EntityTable<StockDto, Guid, StockDto> _table = default!;
+
+
+    StockDto newdto = new StockDto();
+
+    public bool _isOpen;
+    public bool _isOpenSave;
+    public bool _isSearchFuncInvoked;
+    bool _isInvoiceEdit;
+    bool is_QuantityError;
+
+    public bool _isEdit;
+
+    [Inject]
+    protected IInvoiceClient InvoiceClient { get; set; } = default!;
+
+    [CascadingParameter]
+    protected Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    [Inject]
+    protected IAuthorizationService AuthService { get; set; } = default!;
+
+    [Inject]
+    protected ICashTransactionClient CashClient { get; set; } = default!;
+
+    private Guid LoggedInuserid { get; set; }
+
+    public List<StockDto> selectlistStockDto = new List<StockDto>();
+
+    CashTransactionDto cashdto = new CashTransactionDto();
+
+    List<CashTransactionTypeDto> lstCashTranTypes = new List<CashTransactionTypeDto>();
+
+    protected override async void OnInitialized()
+    {
+
+        Context = new(
+            entityName: L["Stock"],
+            entityNamePlural: L["Stock"],
+            entityResource: FSHResource.Stock,
+            updateAction: string.Empty,
+            deleteAction: string.Empty,
+            createAction: string.Empty,
+            fields: new()
+                            {
+                            new(stock => stock.StockCode, L["Stock Code"], "Stock Code"),
+                            new(stock => stock.Quantity, L["Quantity"], "Quantity"),
+                            },
+            idFunc: stock => stock.Id,
+            searchFunc: async filter =>
+            {
+                return await CustomSearch(filter);
+            },
+
+            hasExtraActionsFunc: () => true,
+            exportAction: string.Empty
+            );
+
+        var user = (await AuthState).User;
+        LoggedInuserid = new Guid(user.GetUserId());
+
+        var listims = await CashClient.GetAllCashTransactionsTypesAsync();
+
+        lstCashTranTypes = listims.ToList();
+
+    }
+
+
+    private async Task SaveInvoice()
+    {
+        try
+        {
+
+
+            if (_isInvoiceEdit == false)
+            {
+                //Create
+                invoice.CustomerId = context.CustomerID;
+                invoice.UserId = LoggedInuserid;
+                invoice.InvoiceNo = Guid.NewGuid().ToString();
+                // invoice.Freight = 1m;
+                // invoice.TotalsDiscount = 2m;
+
+
+                var createdinvoice = await InvoiceClient.CreateInvoiceAsync(invoice);
+
+                foreach (var item in lstlineItemsDtos)
+                {
+                    item.InvoiceId = createdinvoice.Id;
+                    var createdlineitem = await InvoiceClient.CreateInvoiceItemAsync(item);
+                    item.UserId = LoggedInuserid;
+                    item.Id = createdlineitem.Id;
+                }
+
+
+                cashdto.UserId = LoggedInuserid;
+                cashdto.TransactionDate = DateTime.Now;
+                cashdto.Amount = createdinvoice.TotalDue;
+                cashdto.Ref_Id = createdinvoice.Id;
+                cashdto.CashTransactionTypeId = lstCashTranTypes.Where(z => z.Name == "SAL").Select(x => x.Id).FirstOrDefault();
+                cashdto.CashTransactionName = lstCashTranTypes.Where(z => z.Name == "SAL").Select(x => x.Name).FirstOrDefault();
+
+                cashdto = await CashClient.CreateCashTransActionAsync(cashdto);
+            }
+            else
+            {
+                //Update
+
+                var createdinvoice = await InvoiceClient.UpdateInvoiceAsync(invoice);
+
+                var lstcreatedlineitems = await InvoiceClient.UpdateInvoiceLineItemsAsync(lstlineItemsDtos);
+                //item.Id = createditem.Id;
+
+                cashdto.UserId = LoggedInuserid;
+                cashdto.TransactionDate = DateTime.Now;
+                cashdto.Amount = createdinvoice.TotalDue;
+                cashdto.Ref_Id = createdinvoice.Id;
+                cashdto.CashTransactionTypeId = lstCashTranTypes.Where(z => z.Name == "SAL").Select(x => x.Id).FirstOrDefault();
+                cashdto.CashTransactionName = lstCashTranTypes.Where(z => z.Name == "SAL").Select(x => x.Name).FirstOrDefault();
+
+
+                await CashClient.DeleteCashTransactionAsync(cashdto.Id);
+
+                cashdto = await CashClient.CreateCashTransActionAsync(cashdto);
+
+            }
+
+            //Update Stock Quantity
+            foreach (var stock in selectlistStockDto)
+            {
+                await StockClient.UpdateAsync(stock.Id, stock);
+            }
+
+
+
+            _isInvoiceEdit = true;
+            //_isOpenSave = true;
+
+            Snackbar.Add("Invoice Created", Severity.Success);
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+
+            throw ex;
+        }
+
+    }
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        context = await sessionStorage.GetItemAsync<CustomerDto>("InvoiceCustomer");
+    }
+
+    void DeleteFromList(InvoiceLineItemsDto item)
+    {
+        lstlineItemsDtos.Remove(item);
+
+        foreach (var stock in selectlistStockDto)
+        {
+            if (stock.StockCode == item.StockCode)
+            {
+                stock.Quantity = stock.Quantity + item.Quanity;
+            }
+        }
+
+        Calculate();
+
+        _isSearchFuncInvoked = true;
+        PaginationFilter filter = new PaginationFilter();
+        Context.SearchFunc.Invoke(filter);
+        _table.ReloadDataAsync();
+    }
+
+
+    void EditListItem(InvoiceLineItemsDto item)
+    {
+        _isEdit = true;
+        _isOpen = true;
+        lineitem = item;
+    }
+
+    void Calculate()
+    {
+        if (lineitem.Quanity > lineitem.CurrentStockQuanity)
+        {
+            is_QuantityError = true;
+        }
+        else
+        {
+            is_QuantityError = false;
+
+            lineitem.Total = ((lineitem.Quanity * lineitem.Price) - lineitem.Discount);
+            decimal vat = (15m / 100m); //* lineitem.Total;
+
+            var vattotal = vat * lineitem.Total;
+
+            lineitem.VatTotal = Math.Round(vattotal, 2);
+
+            lineitem.Total = Math.Round(lineitem.Total + lineitem.VatTotal, 2);
+
+            //lineitem.CurrentStockQuanity = lineitem.CurrentStockQuanity - lineitem.Quanity;
+
+            //CurrentStockQuantity = lineitem.CurrentStockQuanity - lineitem.Quanity;
+        }
+
+        StateHasChanged();
+
+
+
+    }
+
+    void Save()
+    {
+        InvoiceLineItemsDto newitem = new InvoiceLineItemsDto();
+
+        Calculate();
+
+        newitem = lineitem;
+
+        if (_isEdit == false)
+        {
+            lstlineItemsDtos.Add(newitem);
+            _isEdit = false;
+        }
+
+
+        invoice.TotalsAmount = Math.Round(lstlineItemsDtos.Sum(t => t.Total), 2);
+        invoice.TotalsVat = Math.Round(lstlineItemsDtos.Sum(t => t.VatTotal), 2);
+        invoice.TotalsDiscount = Math.Round(lstlineItemsDtos.Sum(t => t.Discount), 2);
+        invoice.TotalDue = Math.Round(invoice.TotalsAmount + invoice.Freight);
+
+        lineitem.CurrentStockQuanity = lineitem.CurrentStockQuanity - lineitem.Quanity;
+
+        foreach (var stock in selectlistStockDto)
+        {
+            if (stock.StockCode == lineitem.StockCode)
+            {
+                stock.Quantity = lineitem.CurrentStockQuanity;
+            }
+        }
+
+        _isEdit = false;
+        _isOpen = false;
+
+
+        lineitem = new InvoiceLineItemsDto();
+
+        _isSearchFuncInvoked = true;
+        PaginationFilter filter = new PaginationFilter();
+
+        Context.SearchFunc.Invoke(filter);
+        //Context.ClientContext.LoadDataFunc.Invoke();
+
+        _table.ReloadDataAsync();
+
+
+    }
+
+    public void ToggleOpen()
+    {
+        if (_isOpen)
+        {
+            _isOpen = false;
+        }
+        else
+        {
+            _isOpen = true;
+        }
+        //StateHasChanged();
+
+    }
+
+    public void ToggleOpenSave()
+    {
+        if (_isOpenSave)
+        {
+            _isOpenSave = false;
+
+        }
+        else
+        {
+            _isOpenSave = true;
+        }
+        //StateHasChanged();
+
+    }
+
+
+    void AddStockCode(StockDto stock)
+    {
+        _isOpen = true;
+        lineitem.StockCode = stock.StockCode;
+        lineitem.Description = stock.Description;
+        lineitem.CurrentStockQuanity = stock.Quantity;
+        CurrentStockQuantity = stock.Quantity;
+        lineitem.Price = stock.RetailPrice;
+
+
+    }
+
+    private async Task<PaginationResponse<StockDto>> CustomSearch(PaginationFilter filter)
+    {
+        PaginationResponse<StockDto> paginationresponse = new PaginationResponse<StockDto>();
+        PaginationResponseOfStockDto paginationResponseOfStockDto = new PaginationResponseOfStockDto();
+
+        try
+        {
+            var listims = await StockClient.SearchAsync(filter.Adapt<SearchStockRequest>());
+
+            if (_isSearchFuncInvoked)
+            {
+                paginationResponseOfStockDto.Data = selectlistStockDto.OrderBy(x => x.StockCode).ToList();
+            }
+            else
+            {
+
+                selectlistStockDto = listims.Data.ToList();
+                paginationResponseOfStockDto.Data = listims.Data.OrderBy(x => x.StockCode).ToList();
+            }
+            paginationResponseOfStockDto.CurrentPage = listims.CurrentPage;
+            paginationResponseOfStockDto.HasPreviousPage = listims.HasPreviousPage;
+            paginationResponseOfStockDto.HasNextPage = listims.HasNextPage;
+            paginationResponseOfStockDto.PageSize = listims.PageSize;
+            paginationResponseOfStockDto.TotalCount = listims.TotalCount;
+            paginationResponseOfStockDto.TotalPages = listims.TotalPages;
+        }
+        catch (Exception ex)
+        {
+            throw ex;
+        }
+        paginationresponse = paginationResponseOfStockDto.Adapt<PaginationResponse<StockDto>>();
+
+        return paginationresponse;
+    }
+
+
+    public async void PrintReceipt()
+    {
+
+        DialogIsOpen = true;
+        StateHasChanged();
+        var ms = new MemoryStream();
+
+        CustomerReceiptDto cutomerreceipt = new CustomerReceiptDto();
+        cutomerreceipt.Customerdto = context;
+        cutomerreceipt.Invoicedto = invoice;
+        cutomerreceipt.Lineitemsdto = lstlineItemsDtos;
+
+        PDFDto dto = await pdfservice.GetReceiptPdfTemplateAsync(cutomerreceipt);
+        ms = new MemoryStream(dto.FileStreamResultArray);
+
+        StreamReader reader = new StreamReader(ms);
+        string text = reader.ReadToEnd();
+
+        //File Download
+        await JSRuntime.SaveAs("Receipt.pdf", ms.ToArray());
+        //Opem in new tab
+        JSRuntime.OpenNewTab("Receipt.pdf", ms.ToArray());
+
+        DialogIsOpen = false;
+        StateHasChanged();
+    }
+
+    public async void PrintDeliveryNote()
+    {
+
+        DialogIsOpen = true;
+        StateHasChanged();
+        var ms = new MemoryStream();
+
+        CustomerReceiptDto cutomerreceipt = new CustomerReceiptDto();
+        cutomerreceipt.Customerdto = context;
+        cutomerreceipt.Invoicedto = invoice;
+        cutomerreceipt.Lineitemsdto = lstlineItemsDtos;
+
+        PDFDto dto = await pdfservice.GetDeliveryNotePdfTemplateAsync(cutomerreceipt);
+        ms = new MemoryStream(dto.FileStreamResultArray);
+
+        StreamReader reader = new StreamReader(ms);
+        string text = reader.ReadToEnd();
+
+        //File Download
+        await JSRuntime.SaveAs("DeliveryNote.pdf", ms.ToArray());
+        //Opem in new tab
+        JSRuntime.OpenNewTab("DeliveryNote.pdf", ms.ToArray());
+
+        DialogIsOpen = false;
+        StateHasChanged();
+    }
+
+}

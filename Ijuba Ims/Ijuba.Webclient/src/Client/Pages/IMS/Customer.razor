@@ -1,0 +1,323 @@
+﻿@page "/Customer"
+@attribute [MustHavePermission(FSHAction.View, FSHResource.Customer)]
+@inject IStringLocalizer<Customer> L
+
+
+<FshTitle Title="@L["Customers"]" Description="@L["Manage Customers"]" />
+
+
+<EntityTable TEntity="CustomerDto" TId="Guid" TRequest="CustomerDto" Context="@Context">
+
+    <EditFormContent>
+
+        <MudPopover Open="@_isOpen" Fixed="true" Class="px-4 pt-4">
+            <div class="d-flex flex-column">
+                <MudText>The Account Number has Already Been Used!.</MudText>
+                <MudButton OnClick="@ToggleOpen" Class="ml-auto mr-n3 mb-1" Color="Color.Error">Close</MudButton>
+            </div>
+        </MudPopover>
+
+
+        @*      @if (Context.AddEditModal.IsCreate)
+        {
+        Navigation.NavigateTo("/Creditordetail");
+
+        } *@
+
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.CompanyName)" @bind-Value="@context.CompanyName" Label="@L["Company Name"]" />
+        </MudItem>
+
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.AccountNo)" @bind-Value="@context.AccountNo" Label="@L["Account No"]" OnBlur="@HandleAccountAsync" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.CompanyNameTA)" @bind-Value="@context.CompanyNameTA" Label="@L["Company Name TA"]" />
+        </MudItem>
+
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.CompanyRegNo)" @bind-Value="@context.CompanyRegNo" Label="@L["Company Reg No"]" />
+        </MudItem>
+
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.CustomerVatRegNo)" @bind-Value="@context.CustomerVatRegNo" Label="@L["Customer Vat Reg No"]" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.CustomerContactName)" @bind-Value="@context.CustomerContactName" Label="@L["Customer Contact Name"]" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.CustomerNo)" @bind-Value="@context.CustomerNo" Label="@L["Customer No"]" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.AddressLine1)" @bind-Value="@context.AddressLine1" Label="@L["Address Line 1"]" />
+        </MudItem>
+
+
+
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.AddressLine2)" @bind-Value="@context.AddressLine2" Label="@L["Address Line 2"]" />
+        </MudItem>
+
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.Suburb)" @bind-Value="@context.Suburb" Label="@L["Suburb"]" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.City)" @bind-Value="@context.City" Label="@L["City"]" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.Province)" @bind-Value="@context.Province" Label="@L["Province"]" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.PostalCode)" @bind-Value="@context.PostalCode" Label="@L["PostalCode"]" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.EmailAddress)" @bind-Value="@context.EmailAddress" Label="@L["EmailAddress"]" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.ContactNo)" @bind-Value="@context.ContactNo" Label="@L["ContactNo"]" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.AlternativeContactNo)" @bind-Value="@context.AlternativeContactNo" Label="@L["Alternative Contact No"]" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.AlternativeContactNo2)" @bind-Value="@context.AlternativeContactNo2" Label="@L["Alternative Contact No2"]" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.BankName)" @bind-Value="@context.BankName" Label="@L["Banking Name"]" />
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.BranchCode)" @bind-Value="@context.BranchCode" Label="@L["BranchCode"]" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.AccountType)" @bind-Value="@context.AccountType" Label="@L["AccountType"]" />
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.AccountNumber)" @bind-Value="@context.AccountNumber" Label="@L["AccountNumber"]" />
+        </MudItem>
+
+
+
+
+    </EditFormContent>
+
+
+
+</EntityTable>
+
+
+
+@code {
+
+    [CascadingParameter]
+    protected Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    [Inject]
+    protected IAuthorizationService AuthService { get; set; } = default!;
+
+    [Inject]
+    protected ICustomerClient IMSClient { get; set; } = default!;
+
+    protected EntityServerTableContext<CustomerDto, Guid, CustomerDto> Context { get; set; } = default!;
+
+    CancellationToken? cancellationToken = null;
+
+    private Guid LoggedInuserid { get; set; }
+    private string FirstName { get; set; }
+    private string LastName { get; set; }
+    public bool _isOpen;
+    PaginationResponse<CustomerDto> paginationresponse = new PaginationResponse<CustomerDto>();
+    PaginationResponseOfCustomerDto PaginationResponseOfcustomerDto = new PaginationResponseOfCustomerDto();
+
+    protected override async void OnInitialized()
+    {
+        //await _localStorage.RemoveItemAsync(StorageConstants.Local.Deliveries, cancellationToken);
+
+
+        var user = (await AuthState).User;
+        LoggedInuserid = new Guid(user.GetUserId());
+        FirstName = user.GetFirstName();
+        LastName = user.GetSurname();
+
+        Context = new(
+            entityName: L["Customer"],
+            entityNamePlural: L["Customer"],
+            entityResource: FSHResource.Supplier,
+            fields: new()
+                            {
+                new(customer => customer.CustomerID, L["Id"], "Id"),
+                new(customer => customer.CompanyName, L["Company Name"], "Company Name"),
+                new(customer => customer.ContactNo, L["Contact Details"], "Contact No"),
+                new(customer => customer.CustomerNo, L["Vendor No"], "Vendor No"),
+                new(customer => customer.AccountNo, L["Account No"], "Account No"),
+                            },
+            idFunc: customer => customer.CustomerID,
+
+
+            searchFunc: async filter =>
+            {
+                return await CustomSearch(filter);
+            },
+
+            createFunc: async customer =>
+            {
+
+                await CreateCustomer(customer);
+            },
+
+            updateFunc: async (id, customer) =>
+            {
+                await UpdateCustomer(customer);
+            },
+            deleteFunc: async id => await IMSClient.DeleteCustomerAsync(id),
+            exportAction: string.Empty
+            );
+
+        //newdto =  await _localStorage.GetItemAsync<DeliveryDto>(StorageConstants.Local.Deliveries);
+    }
+
+
+
+    public void ToggleOpen()
+    {
+        if (_isOpen)
+        {
+            _isOpen = false;
+        }
+        else
+        {
+            _isOpen = true;
+        }
+        //StateHasChanged();
+        Context.AddEditModal.ForceRender();
+    }
+
+    public async Task HandleAccountAsync()
+    {
+        // await Task.Delay(100);
+        // throw new Exception("Something went wrong...");
+
+        foreach (var sup in PaginationResponseOfcustomerDto.Data)
+        {
+            if (Context.AddEditModal.RequestModel.AccountNo == sup.AccountNo)
+            {
+                _isOpen = true;
+                //StateHasChanged();
+                Context.AddEditModal.ForceRender();
+            }
+        }
+
+
+    }
+
+    private async Task<PaginationResponse<CustomerDto>> CustomSearch(PaginationFilter filter)
+    {
+
+
+        // if (CanViewAdministrationGroup)
+        // {
+        //     paginationResponseOfLoanDto = await LoansClient.SearchAsync(filter.Adapt<SearchLoansRequest>());
+        // }
+        // else
+        // {
+
+        try
+        {
+
+
+            var listims = await IMSClient.SearchCustomerAsync();
+
+            PaginationResponseOfcustomerDto.Data = listims.Data.ToList();
+            PaginationResponseOfcustomerDto.CurrentPage = listims.CurrentPage;
+            PaginationResponseOfcustomerDto.HasPreviousPage = listims.HasPreviousPage;
+            PaginationResponseOfcustomerDto.HasNextPage = listims.HasNextPage;
+            PaginationResponseOfcustomerDto.PageSize = listims.PageSize;
+            PaginationResponseOfcustomerDto.TotalCount = listims.TotalCount;
+            PaginationResponseOfcustomerDto.TotalPages = listims.TotalPages;
+        }
+        catch (Exception ex)
+        {
+            throw ex;
+        }
+
+
+        // }
+
+
+        paginationresponse = PaginationResponseOfcustomerDto.Adapt<PaginationResponse<CustomerDto>>();
+
+        return paginationresponse;
+    }
+
+
+    private async Task CreateCustomer(CustomerDto dto)
+    {
+        try
+        {
+            //dto.BankingDetails = bankingdto;
+            //dto.ContactDetails = contactdto;
+            dto.CreatedBy = LoggedInuserid;
+
+            await IMSClient.CreateCustomerAsync(dto);
+
+        }
+        catch (Exception ex)
+        {
+
+            throw ex;
+        }
+    }
+
+
+    private async Task UpdateCustomer(CustomerDto dto)
+    {
+        try
+        {
+
+            dto.LastModifiedBy = LoggedInuserid;
+            await IMSClient.UpdateCustomerAsync(dto);
+
+        }
+        catch (Exception ex)
+        {
+
+            throw ex;
+        }
+    }
+
+    private async Task DeleteCreditor(CustomerDto dto)
+    {
+        try
+        {
+
+
+            await IMSClient.DeleteCustomerAsync(dto.CustomerID);
+
+        }
+        catch (Exception ex)
+        {
+
+            throw ex;
+        }
+    }
+
+}

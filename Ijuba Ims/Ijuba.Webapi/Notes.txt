@@ -1,0 +1,33 @@
+To create a new WeB Client - BoilerPlate
+dotnet new fsh-blazor -o FSH.Blazor
+
+To create a new  Web API
+fsh api new FSH.Starter
+
+API Credentials
+{
+    "email":"admin@root.com",
+    "password":"123Pa$$word!"
+}
+
+Hangfire "Credentials": {
+   "User": "Admin",
+   "Password": "S3(r3tP@55w0rd"
+ }
+ 
+ --Configuration setting stored in webapi/src/host/configuration folder
+ 
+ 
+ --Webapi/Host 
+ dotnet ef migrations add StockSupplierID --project .././Migrators/Migrators.mssql/ --context ApplicationDbContext -o Migrations/Application
+
+ --Get List Of Migrations
+ dotnet ef migrations list  --project .././Migrators/Migrators.mssql/ --context ApplicationDbContext
+
+ --Update Database
+ dotnet ef database update --project .././Migrators/Migrators.mssql/ --context ApplicationDbContext
+
+ dotnet ef database update 20231206120547_Customer --project .././Migrators/Migrators.mssql/ --context ApplicationDbContext
+
+--Remove Migration
+dotnet ef migrations remove --project .././Migrators/Migrators.mssql/ --context ApplicationDbContext

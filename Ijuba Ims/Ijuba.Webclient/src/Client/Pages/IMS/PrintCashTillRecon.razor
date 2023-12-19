@@ -1,0 +1,85 @@
+﻿@page "/printcashtillrecon"
+@attribute [MustHavePermission(FSHAction.View, FSHResource.Customer)]
+@inject IStringLocalizer<CashTransaction> L
+@using MudBlazor
+@using Microsoft.AspNetCore.Components
+@inject NavigationManager Navigation
+@inject IPDFClient pdfservice
+@inject IJSRuntime JSRuntime
+
+@if (DialogIsOpen)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    <MudAlert Severity="MudBlazor.Severity.Warning" Variant="Variant.Filled">Please wait document generating and downloading</MudAlert>
+}
+
+<MudGrid>
+    <MudItem xs="12" md="3">
+        <MudText> StartDate </MudText>
+    </MudItem>
+    <MudItem xs="12" md="3">
+        <MudDatePicker Label="Start Date" @bind-Date="@startdate" DateFormat="dd/MM/yyyy" />
+    </MudItem>
+    <MudItem xs="12" md="3">
+        <MudText> EndDate </MudText>
+    </MudItem>
+    <MudItem xs="12" md="3">
+        <MudDatePicker Label="End Date" @bind-Date="@enddate" DateFormat="dd/MM/yyyy" />
+    </MudItem>
+    <MudItem xs="12" md="4">
+        <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary" OnClick="PrintRecon">Print Recon</MudButton>
+    </MudItem>
+
+    @* <MudItem xs="12" md="4">
+        <MudButton Size="@Size.Small" Variant="@Variant.Filled" Color="@Color.Primary" OnClick="PrintCSV">Print CSV</MudButton>
+    </MudItem *@>
+</MudGrid>
+
+@code {
+
+   public DateTime? startdate = DateTime.Today;
+
+    public DateTime? enddate = DateTime.Now.Date;
+
+
+
+    DateTime test = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day);
+
+    bool DialogIsOpen = false;
+
+    async void PrintRecon()
+    {
+        try
+        {
+            DialogIsOpen = true;
+
+            var ms = new MemoryStream();
+
+            PrintCashTillReconDto pdto = new PrintCashTillReconDto();
+            pdto.Startdate = startdate;
+            pdto.Enddate = enddate;
+
+            PDFDto dto = await pdfservice.GetCashTillReconPdfTemplateAsync(pdto);
+            ms = new MemoryStream(dto.FileStreamResultArray);
+
+            
+
+            await JSRuntime.SaveAs("Cash Till Recon.pdf", ms.ToArray());
+            JSRuntime.OpenNewTab("Cash Till Recon.pdf", ms.ToArray());
+
+            DialogIsOpen = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+
+            throw ex;
+        }
+    }
+
+
+    
+}
+}
+
+

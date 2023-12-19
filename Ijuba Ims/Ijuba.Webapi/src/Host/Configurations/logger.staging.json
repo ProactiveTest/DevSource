@@ -1,0 +1,7 @@
+{
+  "LoggerSettings": {
+    "AppName": "Ijuba.Webapi",
+    "WriteToFile": false,
+    "StructuredConsoleLogging": true
+  }
+}

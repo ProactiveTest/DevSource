@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net7.0</TargetFramework>
+        <RootNamespace>Ijuba.Webapi.Shared</RootNamespace>
+        <AssemblyName>Ijuba.Webapi.Shared</AssemblyName>
+    </PropertyGroup>
+    <ItemGroup>
+      <PackageReference Include="Select.HtmlToPdf.NetCore" Version="23.2.0" />
+    </ItemGroup>
+    <ItemGroup>
+      <PackageReference Update="Roslynator.Analyzers" Version="4.2.0">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
+    </ItemGroup>
+</Project>

@@ -1,0 +1,121 @@
+﻿@page "/StockAdjustment"
+@attribute [MustHavePermission(FSHAction.View, FSHResource.Stock)]
+@inject IStringLocalizer<StockAdjustment> L
+@inject Blazored.SessionStorage.ISessionStorageService sessionStorage
+@inject NavigationManager Navigation
+
+<MudCard Elevation="25">
+    <MudCardHeader>
+        <CardHeaderContent>
+              @if (AdjustmentType == "Auto")
+              {
+                <MudText>Automatic Adjustment</MudText>
+            }
+            else
+            {
+                <MudText>Manual Adjustment</MudText>
+            }
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudGrid>
+            @if(stock != null)
+            {
+                <MudItem xs="12" md="6">
+                    <MudTextField T="string" @bind-Value="@stock.StockCode" Label="@L["Stock Code"]" ReadOnly/>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudTextField T="string" @bind-Value="@stock.Description" Label="@L["Description"]" ReadOnly />
+                </MudItem>
+            }
+            @if (AdjustmentType == "Auto")
+            {
+                <MudItem xs="12" md="6">
+                    <MudTextField T="decimal" @bind-Value="@sumQuantity" Label="@L["Current Quantity"]" ReadOnly />
+                </MudItem>
+            
+                <MudItem xs="12" md="6">
+                    <MudTextField T="int" @bind-Value="@tran.Quantity" Label="@L["New Quanity"]" />
+                </MudItem>
+            }
+            else
+            {
+                <MudItem xs="12" md="6">
+                    <MudTextField T="int" @bind-Value="@tran.Quantity" Label="@L["Adjust Quanity"]" />
+                </MudItem>
+            }
+
+        </MudGrid>
+
+    </MudCardContent>
+    <MudCardActions Class="pb-4 pl-4">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto" OnClick="Save" StartIcon="@Icons.Filled.Save"
+                   ButtonType="ButtonType.Submit">@L["Save"]</MudButton>
+    </MudCardActions>
+</MudCard>
+
+
+    @code {
+    StockDto stock;
+    string AdjustmentType;
+    StockTransactionDto tran = new StockTransactionDto();
+    decimal sumQuantity = 0;
+    private Guid LoggedInuserid { get; set; }
+
+    [CascadingParameter]
+    protected Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    [Inject]
+    protected IAuthorizationService AuthService { get; set; } = default!;
+
+    [Inject]
+    protected IStockClient StockClient { get; set; } = default!;
+
+
+    protected override async void OnInitialized()
+    {
+
+        var user = (await AuthState).User;
+        LoggedInuserid = new Guid(user.GetUserId());
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        stock = await sessionStorage.GetItemAsync<StockDto>("AdjustmentStock");
+        AdjustmentType = await sessionStorage.GetItemAsync<string>("AdjustmentType");
+
+        PaginationFilter filter = new PaginationFilter();
+        var lststockitems = await StockClient.SearchAsync(filter.Adapt<SearchStockRequest>());
+        //var lststockitems = await StockClient.SearchAsync();
+        var lstitems = lststockitems.Data.ToList();
+        sumQuantity = lstitems.Where(x => x.StockCode == stock.StockCode).Sum(y => y.Quantity);
+
+
+    }
+
+    public async void Save()
+    {
+        tran.Ref_Id = Guid.NewGuid();
+        tran.TransactionValueId = Guid.NewGuid();
+        tran.StockCode = stock.StockCode;
+        tran.UserID = LoggedInuserid;
+
+        //Create Stock Transaction
+        await StockClient.CreateStockTransactionAsync(tran);
+        if ( AdjustmentType == "Auto")
+        {
+            stock.Quantity = tran.Quantity;
+        }
+        else
+        {
+            stock.Quantity = stock.Quantity + tran.Quantity;
+        }
+
+        //Update Stock Quantity
+        await StockClient.UpdateAsync(stock.Id, stock);
+
+        Navigation.NavigateTo("/stock");
+
+    }
+
+}

@@ -1,0 +1,42 @@
+﻿@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using Microsoft.AspNetCore.Components.WebAssembly.Http
+@using Microsoft.Extensions.Configuration
+@using Microsoft.Extensions.DependencyInjection
+@using Microsoft.Extensions.Localization
+@using Microsoft.JSInterop
+@using Ijuba.Webclient.Client
+@using Ijuba.Webclient.Client.Shared
+@using Ijuba.Webclient.Client.Pages.Authentication
+@using Ijuba.Webclient.Client.Pages.Multitenancy
+@using Ijuba.Webclient.Client.Components.Common
+@using Ijuba.Webclient.Client.Components.EntityTable
+@using Ijuba.Webclient.Client.Components.Localization
+@using Ijuba.Webclient.Client.Components.Notifications
+@using Ijuba.Webclient.Client.Components.ThemeManager
+@using Ijuba.Webclient.Client.Infrastructure.ApiClient
+@using Ijuba.Webclient.Client.Infrastructure.Auth
+@using Ijuba.Webclient.Client.Infrastructure.Common
+@using Ijuba.Webclient.Client.Infrastructure.Notifications
+@using Ijuba.Webclient.Client.Infrastructure.Preferences
+@using FSH.WebApi.Shared.Authorization
+@using Blazored.LocalStorage
+@using Blazored.SessionStorage
+@using Mapster
+@using MediatR.Courier
+@using MudBlazor
+
+@attribute [Authorize]
+
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IConfiguration Config
+@inject IClientPreferenceManager ClientPreferences

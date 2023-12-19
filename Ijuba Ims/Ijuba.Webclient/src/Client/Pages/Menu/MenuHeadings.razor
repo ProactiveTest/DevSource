@@ -1,0 +1,190 @@
+﻿@page "/MenuHeadings"
+@attribute [MustHavePermission(FSHAction.View, FSHResource.Supplier)]
+@inject IStringLocalizer<MenuHeadings> L
+@inject Blazored.SessionStorage.ISessionStorageService sessionStorage
+@inject NavigationManager Navigation
+
+
+<FshTitle Title="@L["Menu Headings"]" Description="@L["Manage Menu Headings"]" />
+
+
+<EntityTable TEntity="MenuHeadingDto" TId="Guid" TRequest="MenuHeadingDto" Context="@Context">
+
+    <EditFormContent>
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="string" For="@(() => context.Name)" @bind-Value="@context.Name" Label="@L["Name"]" />
+        </MudItem>
+
+
+        <MudItem xs="12" md="6">
+            <MudTextField T="int" For="@(() => context.Order)" @bind-Value="context.Order" Label="@L["Order No"]" />
+        </MudItem>
+
+        @if(!Context.AddEditModal.IsCreate)
+        {
+            <MudButton @onclick="() => OpenSubMenu(context)" Class="ml-auto mr-n3 mb-1" Color="Color.Error">Create SubMenus</MudButton>
+        }
+
+
+    </EditFormContent>
+
+
+
+</EntityTable>
+
+
+
+@code {
+
+    [CascadingParameter]
+    protected Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    [Inject]
+    protected IAuthorizationService AuthService { get; set; } = default!;
+
+    [Inject]
+    protected IMenuClient IMSClient { get; set; } = default!;
+
+    protected EntityServerTableContext<MenuHeadingDto, Guid, MenuHeadingDto> Context { get; set; } = default!;
+
+    CancellationToken? cancellationToken = null;
+
+    private Guid LoggedInuserid { get; set; }
+    private string FirstName { get; set; }
+    private string LastName { get; set; }
+    PaginationResponse<MenuHeadingDto> paginationresponse = new PaginationResponse<MenuHeadingDto>();
+    PaginationResponseOfMenuHeadingDto paginationresponseOfMenuHeadingDto = new PaginationResponseOfMenuHeadingDto();
+
+    protected override async void OnInitialized()
+    {
+     
+        var user = (await AuthState).User;
+        LoggedInuserid = new Guid(user.GetUserId());
+        FirstName = user.GetFirstName();
+        LastName = user.GetSurname();
+
+        Context = new(
+            entityName: L["Menu Heading"],
+            entityNamePlural: L["Menu Heading"],
+            entityResource: FSHResource.Supplier,
+            fields: new()
+            {
+                // new(menu => menu.Id, L["Id"], "Id"),
+                new(menu => menu.Name, L["Menu Name"], "Menu Name"),
+                new(menu => menu.Order, L["Menu Heading"], "Menu Heading"),
+               
+            },
+            idFunc: menu => menu.Id,
+
+
+            searchFunc: async filter =>
+            {
+                return await CustomSearch(filter);
+            },
+
+            createFunc: async menu =>
+            {
+
+                await CreateMenuHeading(menu);
+            },
+
+            updateFunc: async (id, menu) =>
+            {
+                await UpdateMenuHeading(menu);
+            },
+            deleteFunc: async id => await IMSClient.DeleteMenuHeadingAsync(id),
+            exportAction: string.Empty
+            );
+    }
+
+
+
+    public async void OpenSubMenu(MenuHeadingDto menuhead)
+    {
+        
+        await sessionStorage.SetItemAsync("MenuHeading", menuhead);
+
+        Navigation.NavigateTo("/SubMenu");
+    }
+
+   
+
+    private async Task<PaginationResponse<MenuHeadingDto>> CustomSearch(PaginationFilter filter)
+    {
+
+
+        try
+        {
+
+
+            var listims = await IMSClient.SearchMenuHeadingAsync();
+
+            paginationresponseOfMenuHeadingDto.Data = listims.Data.ToList();
+            paginationresponseOfMenuHeadingDto.CurrentPage = listims.CurrentPage;
+            paginationresponseOfMenuHeadingDto.HasPreviousPage = listims.HasPreviousPage;
+            paginationresponseOfMenuHeadingDto.HasNextPage = listims.HasNextPage;
+            paginationresponseOfMenuHeadingDto.PageSize = listims.PageSize;
+            paginationresponseOfMenuHeadingDto.TotalCount = listims.TotalCount;
+            paginationresponseOfMenuHeadingDto.TotalPages = listims.TotalPages;
+        }
+        catch (Exception ex)
+        {
+            throw ex;
+        }
+
+        paginationresponse = paginationresponseOfMenuHeadingDto.Adapt<PaginationResponse<MenuHeadingDto>>();
+
+        return paginationresponse;
+    }
+
+
+    private async Task CreateMenuHeading(MenuHeadingDto dto)
+    {
+        try
+        {
+            dto.CreatedBy = LoggedInuserid;
+
+            await IMSClient.CreateMenuHeadingAsync(dto);
+
+        }
+        catch (Exception ex)
+        {
+
+            throw ex;
+        }
+    }
+
+
+    private async Task UpdateMenuHeading(MenuHeadingDto dto)
+    {
+        try
+        {
+
+            dto.LastModifiedBy = LoggedInuserid;
+            await IMSClient.UpdateMenuHeadingAsync(dto.Id, dto);
+
+        }
+        catch (Exception ex)
+        {
+
+            throw ex;
+        }
+    }
+
+    private async Task DeleteMenuHeading(MenuHeadingDto dto)
+    {
+        try
+        {
+
+            await IMSClient.DeleteMenuHeadingAsync(dto.Id);
+
+        }
+        catch (Exception ex)
+        {
+
+            throw ex;
+        }
+    }
+
+}
